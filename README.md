@@ -41,8 +41,8 @@ Swagger UI available at **http://localhost:8000/docs**
 | GET | `/health` | Health check | 200 |
 | GET | `/tasks` | List all tasks | 200 |
 | GET | `/tasks/{id}` | Get task by ID | 200, 404 |
-| POST | `/tasks` | Create task | 201, 400 |
-| PUT | `/tasks/{id}` | Update task | 200, 400, 404 |
+| POST | `/tasks` | Create task | 201, 422 |
+| PUT | `/tasks/{id}` | Update task | 200, 404, 422 |
 | DELETE | `/tasks/{id}` | Delete task | 204, 404 |
 
 ## Example Usage
@@ -58,6 +58,8 @@ curl -i -X POST http://localhost:8000/tasks \
 ```
 HTTP/1.1 201 Created
 content-type: application/json
+content-length: 38
+
 {"id":4,"title":"Buy milk","done":false}
 ```
 
@@ -66,9 +68,27 @@ content-type: application/json
 curl -i http://localhost:8000/tasks
 ```
 
+**Response:**
+```
+HTTP/1.1 200 OK
+content-type: application/json
+content-length: 117
+
+[{"id":1,"title":"Learn FastAPI","done":false},{"id":2,"title":"Build a REST API","done":false},{"id":3,"title":"Deploy to production","done":true}]
+```
+
 ### Get a single task
 ```bash
 curl -i http://localhost:8000/tasks/1
+```
+
+**Response:**
+```
+HTTP/1.1 200 OK
+content-type: application/json
+content-length: 44
+
+{"id":1,"title":"Learn FastAPI","done":false}
 ```
 
 ### Update a task
@@ -78,12 +98,26 @@ curl -i -X PUT http://localhost:8000/tasks/1 \
   -d '{"done":true}'
 ```
 
+**Response:**
+```
+HTTP/1.1 200 OK
+content-type: application/json
+content-length: 44
+
+{"id":1,"title":"Learn FastAPI","done":true}
+```
+
 ### Delete a task
 ```bash
 curl -i -X DELETE http://localhost:8000/tasks/1
 ```
 
-### Invalid input (400 error)
+**Response:**
+```
+HTTP/1.1 204 No Content
+```
+
+### Validation error (empty title)
 ```bash
 curl -i -X POST http://localhost:8000/tasks \
   -H "Content-Type: application/json" \
@@ -93,10 +127,13 @@ curl -i -X POST http://localhost:8000/tasks \
 **Response:**
 ```
 HTTP/1.1 422 Unprocessable Entity
-{"detail":[{"type":"string_too_short","loc":["body","title"],"msg":"String should have at least 1 character","input":""}]}
+content-type: application/json
+content-length: 145
+
+{"detail":[{"type":"string_too_short","loc":["body","title"],"msg":"String should have at least 1 character","input":"","ctx":{"min_length":1}}]}
 ```
 
-### Not found (404 error)
+### Not found error
 ```bash
 curl -i http://localhost:8000/tasks/999
 ```
@@ -104,6 +141,9 @@ curl -i http://localhost:8000/tasks/999
 **Response:**
 ```
 HTTP/1.1 404 Not Found
+content-type: application/json
+content-length: 30
+
 {"detail":"Task 999 not found"}
 ```
 
@@ -111,7 +151,7 @@ HTTP/1.1 404 Not Found
 
 Interactive API documentation available at **http://localhost:8000/docs**
 
-![Swagger UI Screenshot](swagger-screenshot.png)
+![Swagger UI](swagger-screenshot.png)
 
 *Replace `swagger-screenshot.png` with your actual screenshot*
 
@@ -129,6 +169,7 @@ Assignment1/
 - Python 3.10+
 - fastapi
 - uvicorn
+- pydantic
 
 Install with:
 ```bash
