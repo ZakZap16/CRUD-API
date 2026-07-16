@@ -22,6 +22,11 @@ class TaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200, description="Task title")
 
 
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    done: Optional[bool] = None
+
+
 class Task(BaseModel):
     id: int
     title: str
@@ -89,6 +94,44 @@ async def create_task(task_data: TaskCreate):
     tasks.append(new_task)
     next_id += 1
     return new_task
+
+
+@app.put(
+    "/tasks/{task_id}",
+    response_model=Task,
+    summary="Update a task",
+    description="Updates a task by ID. Can update title and/or done status."
+)
+async def update_task(task_id: int, task_data: TaskUpdate):
+    for i, task in enumerate(tasks):
+        if task["id"] == task_id:
+            if task_data.title is not None:
+                tasks[i]["title"] = task_data.title
+            if task_data.done is not None:
+                tasks[i]["done"] = task_data.done
+            return tasks[i]
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Task {task_id} not found"
+    )
+
+
+@app.delete(
+    "/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a task",
+    description="Deletes a task by ID"
+)
+async def delete_task(task_id: int):
+    global tasks
+    for i, task in enumerate(tasks):
+        if task["id"] == task_id:
+            tasks.pop(i)
+            return
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Task {task_id} not found"
+    )
 
 
 if __name__ == "__main__":
