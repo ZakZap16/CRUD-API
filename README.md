@@ -1,4 +1,4 @@
-# Task API - FastAPI CRUD Assignment
+# Tasks - FastAPI CRUD API
 
 A simple task management API built with FastAPI demonstrating full CRUD operations on an in-memory task list. Includes automatic Swagger UI documentation at `/docs`.
 
@@ -35,19 +35,20 @@ Swagger UI available at **http://localhost:8000/docs**
 
 ## Endpoints
 
-| Method | Endpoint | Description | Status Codes |
-|--------|----------|-------------|--------------|
-| GET | `/` | API info | 200 |
-| GET | `/health` | Health check | 200 |
-| GET | `/tasks` | List all tasks | 200 |
-| GET | `/tasks/{id}` | Get task by ID | 200, 404 |
-| POST | `/tasks` | Create task | 201, 422 |
-| PUT | `/tasks/{id}` | Update task | 200, 404, 422 |
-| DELETE | `/tasks/{id}` | Delete task | 204, 404 |
+| Method | Endpoint      | Description    | Status Codes  |
+| ------ | ------------- | -------------- | ------------- |
+| GET    | `/`           | API info       | 200           |
+| GET    | `/health`     | Health check   | 200           |
+| GET    | `/tasks`      | List all tasks | 200           |
+| GET    | `/tasks/{id}` | Get task by ID | 200, 404      |
+| POST   | `/tasks`      | Create task    | 201, 422      |
+| PUT    | `/tasks/{id}` | Update task    | 200, 404, 422 |
+| DELETE | `/tasks/{id}` | Delete task    | 204, 404      |
 
 ## Example Usage
 
 ### Create a task
+
 ```bash
 curl -i -X POST http://localhost:8000/tasks \
   -H "Content-Type: application/json" \
@@ -55,6 +56,7 @@ curl -i -X POST http://localhost:8000/tasks \
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 201 Created
 content-type: application/json
@@ -64,11 +66,13 @@ content-length: 38
 ```
 
 ### List all tasks
+
 ```bash
 curl -i http://localhost:8000/tasks
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 200 OK
 content-type: application/json
@@ -78,11 +82,13 @@ content-length: 117
 ```
 
 ### Get a single task
+
 ```bash
 curl -i http://localhost:8000/tasks/1
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 200 OK
 content-type: application/json
@@ -92,6 +98,7 @@ content-length: 44
 ```
 
 ### Update a task
+
 ```bash
 curl -i -X PUT http://localhost:8000/tasks/1 \
   -H "Content-Type: application/json" \
@@ -99,6 +106,7 @@ curl -i -X PUT http://localhost:8000/tasks/1 \
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 200 OK
 content-type: application/json
@@ -108,16 +116,19 @@ content-length: 44
 ```
 
 ### Delete a task
+
 ```bash
 curl -i -X DELETE http://localhost:8000/tasks/1
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 204 No Content
 ```
 
 ### Validation error (empty title)
+
 ```bash
 curl -i -X POST http://localhost:8000/tasks \
   -H "Content-Type: application/json" \
@@ -125,6 +136,7 @@ curl -i -X POST http://localhost:8000/tasks \
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 422 Unprocessable Entity
 content-type: application/json
@@ -134,11 +146,13 @@ content-length: 145
 ```
 
 ### Not found error
+
 ```bash
 curl -i http://localhost:8000/tasks/999
 ```
 
 **Response:**
+
 ```
 HTTP/1.1 404 Not Found
 content-type: application/json
@@ -151,9 +165,7 @@ content-length: 30
 
 Interactive API documentation available at **http://localhost:8000/docs**
 
-![Swagger UI](swagger-screenshot.png)
-
-*Replace `swagger-screenshot.png` with your actual screenshot*
+![Swagger UI](SwaggerUI.png)
 
 ## Project Structure
 
@@ -172,10 +184,12 @@ Assignment1/
 - pydantic
 
 Install with:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-## License
+## Observation
 
-MIT
+- When restarting the server only the seeded data is there and any other data\task gets deleted.
+- Probably because there is no database or a way to store these data so when the server is restarted nothing gets deleted
