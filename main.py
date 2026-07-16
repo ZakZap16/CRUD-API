@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel
-from typing import List, Dict
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
 
 app = FastAPI(
     title="Task API",
@@ -16,6 +16,10 @@ tasks: List[Dict] = [
     {"id": 3, "title": "Deploy to production", "done": True},
 ]
 next_id = 4
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="Task title")
 
 
 class Task(BaseModel):
@@ -70,6 +74,21 @@ async def get_task(task_id: int):
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Task {task_id} not found"
     )
+
+
+@app.post(
+    "/tasks",
+    response_model=Task,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new task",
+    description="Creates a new task with the given title"
+)
+async def create_task(task_data: TaskCreate):
+    global next_id
+    new_task = {"id": next_id, "title": task_data.title, "done": False}
+    tasks.append(new_task)
+    next_id += 1
+    return new_task
 
 
 if __name__ == "__main__":
