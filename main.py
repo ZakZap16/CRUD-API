@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
+from typing import List, Dict
 
 app = FastAPI(
     title="Task API",
@@ -8,6 +9,20 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+tasks: List[Dict] = [
+    {"id": 1, "title": "Learn FastAPI", "done": False},
+    {"id": 2, "title": "Build a REST API", "done": False},
+    {"id": 3, "title": "Deploy to production", "done": True},
+]
+next_id = 4
+
+
+class Task(BaseModel):
+    id: int
+    title: str
+    done: bool
+
 
 @app.get(
     "/",
@@ -21,6 +36,7 @@ async def root():
         "endpoints": ["/tasks"]
     }
 
+
 @app.get(
     "/health",
     summary="Health check",
@@ -28,6 +44,33 @@ async def root():
 )
 async def health():
     return {"status": "ok"}
+
+
+@app.get(
+    "/tasks",
+    response_model=List[Task],
+    summary="List all tasks",
+    description="Returns a list of all tasks"
+)
+async def list_tasks():
+    return tasks
+
+
+@app.get(
+    "/tasks/{task_id}",
+    response_model=Task,
+    summary="Get a single task",
+    description="Returns a task by its ID"
+)
+async def get_task(task_id: int):
+    for task in tasks:
+        if task["id"] == task_id:
+            return task
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Task {task_id} not found"
+    )
+
 
 if __name__ == "__main__":
     import uvicorn
