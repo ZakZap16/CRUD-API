@@ -1,4 +1,4 @@
-# Task API - FastAPI CRUD Assignment
+# Tasks API - FastAPI CRUD API
 
 A simple task management API built with FastAPI demonstrating full CRUD operations on an in-memory task list. Includes automatic Swagger UI documentation at `/docs`.
 
