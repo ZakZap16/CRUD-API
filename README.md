@@ -1,6 +1,6 @@
-# Tasks - FastAPI CRUD API with SQLite
+# Tasks - FastAPI CRUD API with Pluggable Storage (SQLite / PostgreSQL)
 
-A simple task management API built with FastAPI demonstrating full CRUD operations with **SQLite persistence** using SQLModel. Includes automatic Swagger UI documentation at `/docs`.
+A simple task management API built with FastAPI demonstrating full CRUD operations with **pluggable persistence** — swap between SQLite (dev) and PostgreSQL (prod/Docker) without changing routes or services.
 
 ## Features
 
@@ -13,9 +13,9 @@ A simple task management API built with FastAPI demonstrating full CRUD operatio
 - **DELETE /tasks/{id}** - Delete a task (204 No Content, 404 if not found)
 - **GET /stats** - Get task statistics (total, completed, pending)
 
-All data stored in **SQLite database** (`tasks.db`) - survives server restarts!
+Data persists across restarts using either **SQLite** (default) or **PostgreSQL** (via Docker).
 
-## Quick Start
+## Quick Start (SQLite - Default)
 
 ```bash
 # Clone and enter directory
@@ -32,9 +32,76 @@ python main.py
 ```
 
 Server starts at **http://localhost:8000**  
-Swagger UI available at **http://localhost:8000/docs**
+Swagger UI at **http://localhost:8000/docs**
 
-On first run, the database `tasks.db` is automatically created with 3 seed tasks.
+On first run, the database is auto-created with 3 seed tasks.
+
+## Quick Start (PostgreSQL via Docker)
+
+```bash
+# Start PostgreSQL + API together
+docker compose up -d --build
+
+# API at http://localhost:8000 (connected to Postgres)
+# Postgres at localhost:5432 (user: postgres, pass: postgres, db: tasks)
+
+# Stop stack (to keep data in Docker volume)
+docker compose down
+
+# Stop and remove everything including the data
+docker compose down -v
+```
+
+**Configuration**: Copy `.env.example` to `.env` and set `DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks`
+
+## Architecture: Repository Pattern
+
+The app uses a **repository interface** (`TaskRepository` in `repository.py`) so storage can be swapped without touching routes or services.
+
+```
+Routes → TaskRepository (interface) → DI provides implementation
+                                        ├── SQLiteTaskRepository  (DATABASE_URL=sqlite://...)
+                                        └── PostgresTaskRepository (DATABASE_URL=postgresql://...)
+```
+
+**Changing storage = one line in `dependencies.py`**. Routes and services import only the abstract interface.
+
+## Persistence Verification
+
+### SQLite (Local)
+
+```bash
+# 1. Start server
+python -m app.main
+
+# 2. Create a task
+curl -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Test persistence"}'
+
+# 3. Restart server (Ctrl+C, then python main.py)
+
+# 4. Verify task exists
+curl http://localhost:8000/tasks
+# → Task persists in tasks.db
+```
+
+### PostgreSQL (Docker)
+
+```bash
+# 1. Start stack
+docker compose up -d --build
+
+# 2. Create a task
+curl -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Docker persistence test"}'
+
+# 3. Restart containers
+docker compose restart
+
+# 4. Verify task still exists
+curl http://localhost:8000/tasks
+# → Task persists in Docker volume (postgres_data)
+```
+
+**Tested**: Data survives both app restart and full container restart.
 
 ## Endpoints
 
@@ -52,19 +119,13 @@ On first run, the database `tasks.db` is automatically created with 3 seed tasks
 | DELETE | `/tasks/{id}` | Delete task            | 204, 404      |
 | GET    | `/stats`      | Get statistics         | 200           |
 
-## Query Parameters for GET /tasks
+### Query Parameters for GET /tasks
 
 | Parameter | Values             | Description                               |
 | --------- | ------------------ | ----------------------------------------- |
 | `search`  | string             | Partial match on title (case-insensitive) |
 | `done`    | `true` / `false`   | Filter by completion status               |
 | `sort`    | `title` / `-title` | Sort alphabetically (asc/desc)            |
-
-Examples:
-
-- `/tasks?search=API` → tasks containing "API" in title
-- `/tasks?done=true` → only completed tasks
-- `/tasks?sort=-title` → sort by title descending
 
 ## Example Usage
 
@@ -76,46 +137,16 @@ curl -i -X POST http://localhost:8000/tasks \
   -d '{"title":"Buy milk"}'
 ```
 
-**Response:**
-
-```
-HTTP/1.1 201 Created
-content-type: application/json
-content-length: 38
-
-{"id":4,"title":"Buy milk","done":false,"created_at":"...","updated_at":"..."}
-```
-
 ### List all tasks
 
 ```bash
 curl -i http://localhost:8000/tasks
 ```
 
-**Response:**
-
-```
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: ...
-
-[{"id":1,"title":"Learn FastAPI","done":false,"created_at":"...","updated_at":"..."},{"id":2,"title":"Build a REST API","done":false,"created_at":"...","updated_at":"..."},{"id":3,"title":"Deploy to production","done":true,"created_at":"...","updated_at":"..."}]
-```
-
 ### Get a single task
 
 ```bash
 curl -i http://localhost:8000/tasks/1
-```
-
-**Response:**
-
-```
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: ...
-
-{"id":1,"title":"Learn FastAPI","done":false,"created_at":"...","updated_at":"..."}
 ```
 
 ### Update a task
@@ -126,42 +157,16 @@ curl -i -X PUT http://localhost:8000/tasks/1 \
   -d '{"done":true}'
 ```
 
-**Response:**
-
-```
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: ...
-
-{"id":1,"title":"Learn FastAPI","done":true,"created_at":"...","updated_at":"..."}
-```
-
 ### Delete a task
 
 ```bash
 curl -i -X DELETE http://localhost:8000/tasks/1
 ```
 
-**Response:**
-
-```
-HTTP/1.1 204 No Content
-```
-
 ### Get statistics
 
 ```bash
 curl -i http://localhost:8000/stats
-```
-
-**Response:**
-
-```
-HTTP/1.1 200 OK
-content-type: application/json
-content-length: ...
-
-{"total":4,"completed":2,"pending":2}
 ```
 
 ### Validation error (empty title)
@@ -172,15 +177,7 @@ curl -i -X POST http://localhost:8000/tasks \
   -d '{"title":""}'
 ```
 
-**Response:**
-
-```
-HTTP/1.1 422 Unprocessable Entity
-content-type: application/json
-content-length: ...
-
-{"detail":[{"type":"string_too_short","loc":["body","title"],"msg":"String should have at least 1 character","input":"","ctx":{"min_length":1}}]}
-```
+Returns **422** with validation details.
 
 ### Not found error
 
@@ -188,138 +185,113 @@ content-length: ...
 curl -i http://localhost:8000/tasks/999
 ```
 
-**Response:**
-
-```
-HTTP/1.1 404 Not Found
-content-type: application/json
-content-length: 30
-
-{"detail":"Task 999 not found"}
-```
+Returns **404** with `{"error": "Task not found"}`.
 
 ## Swagger UI
 
-Interactive API documentation available at **http://localhost:8000/docs**
+Interactive API documentation at **http://localhost:8000/docs**
 
 ![Swagger UI](SwaggerUI.png)
 
 ## Database
 
-### Why SQLite?
+### SQLite (Default - Development)
 
-- **Zero configuration** - no separate server process needed
-- **Single file** - entire database in `tasks.db`, easy to backup/move
-- **Cross-platform** - works on Windows, macOS, Linux
-- **SQL standard** - supports standard SQL queries
-- **Lightweight** - perfect for small to medium applications
-- **No dependencies** - included in Python standard library (via SQLModel)
+- **File**: `./tasks.db`
+- **Zero config**, single file, cross-platform
+- Auto-created on first run with 3 seed tasks
 
-### Database Location
+### PostgreSQL (Production / Docker)
 
-The database file is stored at: **`./tasks.db`** (project root directory)
+- **Connection**: `postgresql://postgres:postgres@db:5432/tasks` (inside Docker)
+- **Volume**: `postgres_data` persists data across container restarts
+- **Init script**: `init.sql` creates table + seeds 3 tasks on first container start
 
-### Schema
+### Schema (Both)
 
 ```sql
 CREATE TABLE tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    done BOOLEAN NOT NULL DEFAULT 0,
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    done BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_tasks_title ON tasks (title);
 ```
-
-### Automatic Initialization
-
-On first run, the application:
-
-1. Creates the `tasks` table if it doesn't exist
-2. Inserts 3 seed tasks only if the table is empty:
-   - "Learn FastAPI" (pending)
-   - "Build a REST API" (pending)
-   - "Deploy to production" (completed)
-
-### Database Viewer Screenshot
-
-Open `tasks.db` with **DB Browser for SQLite** to explore the data visually.
-
-![Database Viewer](database-viewer.png)
 
 ### Example SQL Queries
 
-Run these manually in DB Browser for SQLite or any SQLite client:
-
-**List every task:**
+Run in DB Browser (SQLite) or pgAdmin/psql (PostgreSQL):
 
 ```sql
+-- List every task
 SELECT * FROM tasks;
-```
 
-**Show only completed tasks:**
+-- Show only completed tasks
+SELECT * FROM tasks WHERE done = true;
 
-```sql
-SELECT * FROM tasks WHERE done = 1;
-```
-
-**Count all tasks:**
-
-```sql
+-- Count all tasks
 SELECT COUNT(*) FROM tasks;
-```
 
-**Mark every task as completed:**
+-- Mark every task as completed
+UPDATE tasks SET done = true;
 
-```sql
-UPDATE tasks SET done = 1;
-```
+-- Delete all completed tasks
+DELETE FROM tasks WHERE done = true;
 
-**Delete all completed tasks:**
+-- Search tasks by title (like API's ?search=)
+SELECT * FROM tasks WHERE title ILIKE '%API%';
 
-```sql
-DELETE FROM tasks WHERE done = 1;
-```
-
-**Search tasks by title (like the API's `?search=`):**
-
-```sql
-SELECT * FROM tasks WHERE title LIKE '%API%';
-```
-
-**Get statistics (like the API's `/stats`):**
-
-```sql
+-- Get statistics (like API's /stats)
 SELECT
     COUNT(*) as total,
-    SUM(CASE WHEN done = 1 THEN 1 ELSE 0 END) as completed,
-    SUM(CASE WHEN done = 0 THEN 1 ELSE 0 END) as pending
+    SUM(CASE WHEN done THEN 1 ELSE 0 END) as completed,
+    SUM(CASE WHEN NOT done THEN 1 ELSE 0 END) as pending
 FROM tasks;
 ```
-
-Notice how the API immediately reflects your manual database changes!
 
 ## Project Structure
 
 ```
 Assignment1/
-├── main.py           # FastAPI application with SQLModel
-├── requirements.txt  # Python dependencies
-├── README.md         # This file
-├── tasks.db          # SQLite database (auto-created)
-├── SwaggerUI.png     # Swagger UI screenshot
-└── database-viewer.png  # Database viewer screenshot (add yours)
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── config.py
+│   ├── database.py
+│   ├── dependencies.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── task.py
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   └── task.py
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── sqlite.py
+│   │   └── postgres.py
+│   └── routes/
+│       └── __init__.py
+├── docker/
+│   ├── Dockerfile
+│   └── init.sql
+├── docker-compose.yml
+├── .env.example
+├── requirements.txt
+├── README.md
+├── tasks.db
+├── SwaggerUI.png
+└── database-viewer.png
 ```
 
 ## Requirements
 
 - Python 3.10+
-- fastapi
-- uvicorn
-- pydantic
-- sqlmodel
+- Docker & Docker Compose (for PostgreSQL mode)
 
-Install with:
+Install Python deps:
 
 ```bash
 pip install -r requirements.txt
@@ -327,8 +299,7 @@ pip install -r requirements.txt
 
 ## Observation
 
-- **Data now persists across server restarts** - the `tasks.db` file stores all tasks
-- SQLite was chosen for its simplicity, portability, and zero-configuration setup
-- The API behavior remains identical, only the storage layer changed
-- All CRUD operations use SQL queries through SQLModel ORM
-- Additional features included: search, filter, sort, statistics endpoint, timestamps
+- **Data persists across restarts** — both SQLite file (local) and container restarts (Docker/Postgres)
+- **Repository pattern** — storage backend swapped via `DATABASE_URL` without touching routes/services
+- **Assignment 2**: SQLite implementation with all optional extras (search, filter, sort, stats, timestamps)
+- **Assignment 3**: Docker + PostgreSQL, proven persistence, repo pattern documented
