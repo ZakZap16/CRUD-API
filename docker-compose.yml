@@ -25,12 +25,16 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/tasks
       ENVIRONMENT: production
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 10s
 
 volumes:
   postgres_data:

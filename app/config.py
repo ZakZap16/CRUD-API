@@ -10,8 +10,8 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./tasks.db"
     environment: str = "development"
-    SUPABASE_URL: str ="https://qfoqqoxfiewnpiytqyme.supabase.co"
-
+    supabase_url: str = ""
+    supabase_key: str = ""
 
 
 @lru_cache
