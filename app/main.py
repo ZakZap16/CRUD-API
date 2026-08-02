@@ -1,5 +1,4 @@
 import uvicorn
-import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from fastapi import FastAPI, Depends, Query, status
@@ -10,11 +9,8 @@ from app.database import create_db_and_tables, get_session
 from app.dependencies import get_task_repository
 from app.repositories.base import TaskRepository
 from app.schemas.task import TaskCreate, TaskUpdate, TaskRead, StatsResponse
-from app.routes import auth
-from supabase import create_client, Client
-from dotenv import load_dotenv
+from app.routes import auth, public
 
-load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,12 +31,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-supabase: Client = create_client(
-    os.environ.get("SUPABASE_URL"),
-    os.environ.get("SUPABASE_KEY")
-)
-
 app.include_router(auth.router)
+app.include_router(public.router)
+
 
 @app.get(
     "/",

@@ -23,5 +23,15 @@ class UserProfile(BaseModel):
     created_at: str
 
 
+class PublicInfoResponse(BaseModel):
+    message: str
+
+
+class ProtectedProfileResponse(BaseModel):
+    id: str
+    email: str
+    created_at: str
+
+
 class ErrorResponse(BaseModel):
     error: str
