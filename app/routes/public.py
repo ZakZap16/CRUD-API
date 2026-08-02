@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Header
 from typing import Optional
 
+from app.auth.supabase_client import supabase
 from app.schemas.auth import (
     PublicInfoResponse,
     ProtectedProfileResponse,
@@ -28,11 +29,11 @@ async def public_info():
     "/protected/profile",
     response_model=ProtectedProfileResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get protected profile (token presence check only)",
-    description="Checks for Authorization: Bearer <token> header but does not verify token yet",
+    summary="Get protected profile (token verified with Supabase)",
+    description="Verifies the JWT token with Supabase and returns user profile",
     responses={
-        200: {"description": "Profile returned (token verification happens in Stage 3)"},
-        401: {"model": ErrorResponse, "description": "Access token required"},
+        200: {"description": "Profile returned with verified user data"},
+        401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
     },
 )
 async def protected_profile(authorization: Optional[str] = Header(None)):
@@ -56,8 +57,24 @@ async def protected_profile(authorization: Optional[str] = Header(None)):
             detail="Access token required",
         )
     
+
+    try:
+        user_response = supabase.auth.get_user(token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    
+    if user_response.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    
+    user = user_response.user
     return ProtectedProfileResponse(
-        id="pending-verification",
-        email="pending-verification",
-        created_at="pending-verification"
+        id=user.id,
+        email=user.email,
+        created_at=str(user.created_at)
     )
