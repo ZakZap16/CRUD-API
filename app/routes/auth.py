@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 from supabase import Client
 
 from app.auth.supabase_client import supabase
@@ -9,6 +10,8 @@ from app.schemas.auth import (
     AuthResponse,
     ErrorResponse,
 )
+
+security = HTTPBearer()
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -103,6 +106,7 @@ async def login(request: AuthLoginRequest):
         204: {"description": "Logged out successfully"},
         401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
     },
+    dependencies=[Depends(security)],
 )
 async def logout(user: dict = Depends(get_current_user)):
     supabase.auth.sign_out()

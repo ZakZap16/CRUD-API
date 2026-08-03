@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 from typing import Optional
 
 from app.dependencies import get_current_user
@@ -7,6 +8,8 @@ from app.schemas.auth import (
     ProtectedProfileResponse,
     ErrorResponse,
 )
+
+security = HTTPBearer()
 
 router = APIRouter(tags=["Public"])
 
@@ -35,6 +38,7 @@ async def public_info():
         200: {"description": "Profile returned with verified user data"},
         401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
     },
+    dependencies=[Depends(security)],
 )
 async def protected_profile(user: dict = Depends(get_current_user)):
     return ProtectedProfileResponse(
@@ -54,6 +58,7 @@ async def protected_profile(user: dict = Depends(get_current_user)):
         200: {"description": "Dashboard data returned with verified user data"},
         401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
     },
+    dependencies=[Depends(security)],
 )
 async def protected_dashboard(user: dict = Depends(get_current_user)):
     return ProtectedProfileResponse(
