@@ -1,6 +1,6 @@
-# Tasks - FastAPI CRUD API with Pluggable Storage (SQLite / PostgreSQL)
+# Tasks - FastAPI CRUD API with Pluggable Storage (SQLite / PostgreSQL) + Supabase Auth
 
-A simple task management API built with FastAPI demonstrating full CRUD operations with **pluggable persistence** — swap between SQLite (dev) and PostgreSQL (prod/Docker) without changing routes or services.
+A task management API built with FastAPI demonstrating full CRUD operations with **pluggable persistence** — swap between SQLite (dev) and PostgreSQL (prod/Docker) without changing routes or services — secured with **Supabase Auth** (JWT).
 
 ## Features
 
@@ -12,6 +12,12 @@ A simple task management API built with FastAPI demonstrating full CRUD operatio
 - **PUT /tasks/{id}** - Update task title and/or done status (404 if not found)
 - **DELETE /tasks/{id}** - Delete a task (204 No Content, 404 if not found)
 - **GET /stats** - Get task statistics (total, completed, pending)
+- **POST /auth/signup** - Create an account with Supabase Auth
+- **POST /auth/login** - Log in and receive access/refresh JWT tokens
+- **POST /auth/logout** - Log out and invalidate the session (requires Bearer token)
+- **GET /public/info** - Public endpoint, no auth required
+- **GET /protected/profile** - Protected endpoint, verified user data (requires Bearer token)
+- **GET /protected/dashboard** - Protected endpoint, verified user data (requires Bearer token)
 
 Data persists across restarts using either **SQLite** (default) or **PostgreSQL** (via Docker).
 
@@ -27,8 +33,17 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
+# Configure Supabase credentials
+cp .env.example .env
+# 1. Create a free project at https://supabase.com
+# 2. Copy the Project URL and the Publishable (anon) key into .env:
+#    SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+#    SUPABASE_KEY=your-publishable-key
+# 3. In Supabase Dashboard → Authentication → Providers → Email:
+#    turn OFF "Confirm email" (so signup returns tokens immediately)
+
 # Run the server
-python main.py
+python -m app.main
 ```
 
 Server starts at **http://localhost:8000**  
@@ -118,6 +133,12 @@ curl http://localhost:8000/tasks
 | PUT    | `/tasks/{id}` | Update task            | 200, 404, 422 |
 | DELETE | `/tasks/{id}` | Delete task            | 204, 404      |
 | GET    | `/stats`      | Get statistics         | 200           |
+| POST   | `/auth/signup`   | Create account (Supabase)    | 201, 400      |
+| POST   | `/auth/login`    | Log in, get JWT tokens       | 200, 401      |
+| POST   | `/auth/logout`   | Log out (Bearer required)    | 204, 401      |
+| GET    | `/public/info`   | Public info (no auth)        | 200           |
+| GET    | `/protected/profile`  | Verified user profile (Bearer) | 200, 401 |
+| GET    | `/protected/dashboard`| Verified dashboard data (Bearer) | 200, 401 |
 
 ### Query Parameters for GET /tasks
 
@@ -168,6 +189,66 @@ curl -i -X DELETE http://localhost:8000/tasks/1
 ```bash
 curl -i http://localhost:8000/stats
 ```
+
+## Authentication (Supabase Auth)
+
+Protected routes (`/protected/*`, `/auth/logout`) require an `Authorization: Bearer <access_token>` header. Tokens are verified against Supabase on every request (stateless JWT — no session stored in the API).
+
+### Sign up
+
+```bash
+curl -i -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+Returns **201** with `access_token`, `refresh_token` and the created user.
+
+### Log in
+
+```bash
+curl -i -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+Returns **200** with `access_token`, `refresh_token` and the user. Invalid credentials return **401**.
+
+### Access a protected endpoint
+
+```bash
+curl -i http://localhost:8000/protected/profile \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Returns **200** with the verified user's `id`, `email` and `created_at`. Missing/invalid/expired token returns **401** `{"detail": "Invalid or expired token"}`.
+
+### Public endpoint (no auth)
+
+```bash
+curl -i http://localhost:8000/public/info
+```
+
+Returns **200** — accessible without any token.
+
+### Log out
+
+```bash
+curl -i -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Returns **204**. The session is invalidated server-side; the token is rejected on subsequent requests.
+
+## Swagger UI with Bearer Auth
+
+Interactive API documentation at **http://localhost:8000/docs**
+
+1. Open `/docs`
+2. Click **Authorize** (padlock) and paste your access token
+3. All protected endpoints (`/protected/profile`, `/protected/dashboard`, `/auth/logout`) become callable from the UI (authorization persists between requests)
+
+![Swagger UI](SwaggerUI.png)
 
 ### Validation error (empty title)
 
@@ -266,14 +347,20 @@ Assignment1/
 │   │   └── task.py
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   └── task.py
+│   │   ├── task.py
+│   │   └── auth.py
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   └── supabase_client.py
 │   ├── repositories/
 │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── sqlite.py
 │   │   └── postgres.py
 │   └── routes/
-│       └── __init__.py
+│       ├── __init__.py
+│       ├── auth.py
+│       └── public.py
 ├── docker/
 │   ├── Dockerfile
 │   └── init.sql
@@ -290,6 +377,7 @@ Assignment1/
 
 - Python 3.10+
 - Docker & Docker Compose (for PostgreSQL mode)
+- Supabase project (free tier) — set `SUPABASE_URL` and `SUPABASE_KEY` in `.env`
 
 Install Python deps:
 
@@ -303,3 +391,4 @@ pip install -r requirements.txt
 - **Repository pattern** — storage backend swapped via `DATABASE_URL` without touching routes/services
 - **Assignment 2**: SQLite implementation with all optional extras (search, filter, sort, stats, timestamps)
 - **Assignment 3**: Docker + PostgreSQL, proven persistence, repo pattern documented
+- **Assignment 4**: Supabase Auth — signup/login/logout, JWT verified server-side via `supabase.auth.get_user()`, reusable `get_current_user` dependency, protected routes, Swagger UI with Bearer authorization
