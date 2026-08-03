@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional
 
-from app.auth.supabase_client import supabase
+from app.dependencies import get_current_user
 from app.schemas.auth import (
     PublicInfoResponse,
     ProtectedProfileResponse,
@@ -36,45 +36,28 @@ async def public_info():
         401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
     },
 )
-async def protected_profile(authorization: Optional[str] = Header(None)):
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required",
-        )
-    
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required",
-        )
-    
-    token = authorization[7:]  # Remove "Bearer " prefix
-    
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required",
-        )
-    
-
-    try:
-        user_response = supabase.auth.get_user(token)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-    
-    if user_response.user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-    
-    user = user_response.user
+async def protected_profile(user: dict = Depends(get_current_user)):
     return ProtectedProfileResponse(
-        id=user.id,
-        email=user.email,
-        created_at=str(user.created_at)
+        id=user["id"],
+        email=user["email"],
+        created_at=user["created_at"]
+    )
+
+
+@router.get(
+    "/protected/dashboard",
+    response_model=ProtectedProfileResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get protected dashboard",
+    description="Second protected route using the same auth middleware",
+    responses={
+        200: {"description": "Dashboard data returned with verified user data"},
+        401: {"model": ErrorResponse, "description": "Access token required or invalid/expired"},
+    },
+)
+async def protected_dashboard(user: dict = Depends(get_current_user)):
+    return ProtectedProfileResponse(
+        id=user["id"],
+        email=user["email"],
+        created_at=user["created_at"]
     )
